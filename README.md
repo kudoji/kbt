@@ -1,5 +1,5 @@
 # kbt
 
-backup tool built with bash
+simple backup tool built with bash
 
-tool runs on Mac OS/Linux
+the tool runs on Mac OS/Linux
