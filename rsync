@@ -74,15 +74,49 @@ function do_rsync {
 		exit 1
 	fi
 
+	local videos=""
+	local music=""
+	if [ "$OS_TYPE" = "mac" ]; then
+		videos="videos"
+		music="musics"
+	elif [ "$OS_TYPE" = "linux" ]; then
+		videos="Videos"
+		music="Music"
+	fi
+
+	if [[ ! -d "$SOURCE/$music/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/$music/"
+		exit 1
+	fi
+
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_LOG
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
 
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/videos/" "$DEST/videos/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	rsync -vahzi --progress $RS_PARAMS "$SOURCE/videos_seen/" "$DEST/videos_seen/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/musics/" "$DEST/musics/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/trainings/" "$DEST/trainings/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/cloud/" "$DEST/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	if [[ ! -d "$SOURCE/$videos/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/$videos/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/$videos/" "$DEST/videos/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/videos_seen/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/videos_seen/"
+	else
+		rsync -vahzi --progress $RS_PARAMS "$SOURCE/videos_seen/" "$DEST/videos_seen/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/$music/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/$music/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/$music/" "$DEST/musics/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/trainings/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/trainings/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/trainings/" "$DEST/trainings/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/cloud/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/cloud/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/cloud/" "$DEST/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
 
 	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_LOG
 	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
@@ -136,20 +170,45 @@ function do_drives_sync {
 	log_echo "(end) drives syncing" >> $FILE_LOG
 }
 
+function get_os_type {
+	OS_TYPE=""
+	local uname_out="$(uname -s)"
+	case "${uname_out}" in
+		Darwin*)	OS_TYPE="mac";;
+		Linux*)	OS_TYPE="linux";;
+		*)	OS_TYPE="";;
+	esac
+}
+
 if (( $(id -u) != 0 )); then
 	echo "Run script with sudo privileges"
 	exit
 fi
 
 #-----------constants and variables block
+OS_TYPE=""
+get_os_type
+if [[ -z OS_TYPE ]]; then
+	echo "Unknown OS type. Exit..."
+	exit
+fi
+
 MESSAGE_START="Working..."
 MESSAGE_END="Bye!"
 
 FILE_LOG="rsync.log"
 FILE_ERR_LOG="rsync_err.log"
 
-SOURCE="/Volumes/kudoji-hdd"
-DEST="/Volumes/kudoji-wd"
+if [ "$OS_TYPE" = "mac" ]; then
+	SOURCE="/Volumes/kudoji-hdd"
+	DEST="/Volumes/kudoji-wd"
+elif [ "$OS_TYPE" = "linux" ]; then
+	SOURCE="/home/kudoji"
+	DEST="/media/kudoji/kudoji-wd"
+else
+	echo "Unknown OS type. Exit..."
+	exit
+fi
 
 RS_PARAMS=""
 #-----------/constants and variables block
