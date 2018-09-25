@@ -84,11 +84,6 @@ function do_rsync {
 		music="Music"
 	fi
 
-	if [[ ! -d "$SOURCE/$music/" ]]; then
-		log_echo "source directory does not exists ($SOURCE/$music/"
-		exit 1
-	fi
-
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_LOG
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
 
