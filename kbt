@@ -1,17 +1,22 @@
 #!/bin/bash
 
-# function builds a menu
 #
-# takes 2 mandatory parameters:
-# 	$1 - menu text in the following format:
+#	kbt v0.1.1
+#
+
+#
+#	function builds a menu
+#
+#	takes 2 mandatory parameters:
+#	 	$1 - menu text in the following format:
 #			1. option 1
 #			2. option 2
 #			3. option 3
 #			n. option n
 #			0. Exit
-#	$2 - value of n - amount of options apart of exit one
+#		$2 - value of n - amount of options apart of exit one
 #
-#	returns selected option in variable $menu_return
+#		returns selected option in variable $menu_return
 #
 function menu() {
 	menu_return=""
