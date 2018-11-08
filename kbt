@@ -1,17 +1,22 @@
 #!/bin/bash
 
-# function builds a menu
 #
-# takes 2 mandatory parameters:
-# 	$1 - menu text in the following format:
+#	kbt v0.1.1
+#
+
+#
+#	function builds a menu
+#
+#	takes 2 mandatory parameters:
+#	 	$1 - menu text in the following format:
 #			1. option 1
 #			2. option 2
 #			3. option 3
 #			n. option n
 #			0. Exit
-#	$2 - value of n - amount of options apart of exit one
+#		$2 - value of n - amount of options apart of exit one
 #
-#	returns selected option in variable $menu_return
+#		returns selected option in variable $menu_return
 #
 function menu() {
 	menu_return=""
@@ -67,22 +72,53 @@ function do_rsync {
 	fi
 
 	if [[ ! -d $SOURCE ]]; then
-		log_echo "source directory does not exist ($SOURCE)"
+		log_echo " error: source directory does not exist \"$SOURCE\" "
+		log_echo " exiting... "
 		exit 1
 	elif [[ ! -d $DEST ]]; then
-		log_echo "dest directory does not exist ($DEST)"
+		log_echo " error: destination directory does not exist \"$DEST\" "
+		log_echo " exiting... "
 		exit 1
+	fi
+
+	local videos=""
+	local music=""
+	if [ "$OS_TYPE" = "mac" ]; then
+		videos="videos"
+		music="musics"
+	elif [ "$OS_TYPE" = "linux" ]; then
+		videos="Videos"
+		music="Music"
 	fi
 
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_LOG
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
 
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/videos/" "$DEST/videos/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	rsync -vahzi --progress $RS_PARAMS "$SOURCE/videos_seen/" "$DEST/videos_seen/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/musics/" "$DEST/musics/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/trainings/" "$DEST/trainings/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	
-	rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/cloud/" "$DEST/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	if [[ ! -d "$SOURCE/$videos/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/$videos/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/$videos/" "$DEST/videos/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/videos_seen/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/videos_seen/"
+	else
+		rsync -vahzi --progress $RS_PARAMS "$SOURCE/videos_seen/" "$DEST/videos_seen/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/$music/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/$music/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/$music/" "$DEST/musics/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/trainings/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/trainings/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/trainings/" "$DEST/trainings/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
+	if [[ ! -d "$SOURCE/cloud/" ]]; then
+		log_echo "source directory does not exists ($SOURCE/cloud/"
+	else
+		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/cloud/" "$DEST/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	fi
 
 	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_LOG
 	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
@@ -136,35 +172,60 @@ function do_drives_sync {
 	log_echo "(end) drives syncing" >> $FILE_LOG
 }
 
+function get_os_type {
+	OS_TYPE=""
+	local uname_out="$(uname -s)"
+	case "${uname_out}" in
+		Darwin*)	OS_TYPE="mac";;
+		Linux*)	OS_TYPE="linux";;
+		*)	OS_TYPE="";;
+	esac
+}
+
 if (( $(id -u) != 0 )); then
 	echo "Run script with sudo privileges"
 	exit
 fi
 
 #-----------constants and variables block
+OS_TYPE=""
+get_os_type
+if [[ -z OS_TYPE ]]; then
+	echo "Unknown OS type. Exit..."
+	exit
+fi
+
 MESSAGE_START="Working..."
 MESSAGE_END="Bye!"
 
-FILE_LOG="rsync.log"
-FILE_ERR_LOG="rsync_err.log"
+FILE_LOG="kbt.log"
+FILE_ERR_LOG="kbt_error.log"
 
-SOURCE="/Volumes/kudoji-hdd"
-DEST="/Volumes/kudoji-wd"
+if [ "$OS_TYPE" = "mac" ]; then
+	SOURCE="/Volumes/kudoji-hdd"
+	DEST="/Volumes/kudoji-wd"
+elif [ "$OS_TYPE" = "linux" ]; then
+	SOURCE="/home/kudoji"
+	DEST="/media/kudoji/kudoji-wd"
+else
+	echo "Unknown OS type. Exit..."
+	exit
+fi
 
 RS_PARAMS=""
 #-----------/constants and variables block
 
 menu_text="Script syncs source and destination folders where
-sourse is '$SOURCE'
-destination is '$DEST'
+ - source is \"$SOURCE\"
+ - destination is \"$DEST\"
 
 All output saves into two files:
-a log file: '$FILE_LOG'
-and an error log file: '$FILE_ERR_LOG'
+ - a log file: \"$FILE_LOG\"
+ - an error log file: \"$FILE_ERR_LOG\"
 
 WARNING! Script makes the destination folder identical to the source
 
-Please select:
+Please select action:
 
 1. sync test & exit
 2. sync & exit

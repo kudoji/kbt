@@ -1,3 +1,8 @@
-version 0.1
+[0.1.1]
+
+ * merge scripts (#6c6556e24a)
+ * rename tool to kbt (#ff451db4c0)
+
+[0.1]
 
 Initial version for two similar scripts for Mac OS and Linux systems.
