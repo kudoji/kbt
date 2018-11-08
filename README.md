@@ -1,5 +1,5 @@
 # kbt
 
-simple backup tool built with bash
+kbt is a simple backup tool built with bash.
 
-the tool runs on Mac OS/Linux
+The tool runs on Mac OS and Linux based distributions.

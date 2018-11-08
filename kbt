@@ -67,10 +67,12 @@ function do_rsync {
 	fi
 
 	if [[ ! -d $SOURCE ]]; then
-		log_echo "source directory does not exist ($SOURCE)"
+		log_echo " error: source directory does not exist \"$SOURCE\" "
+		log_echo " exiting... "
 		exit 1
 	elif [[ ! -d $DEST ]]; then
-		log_echo "dest directory does not exist ($DEST)"
+		log_echo " error: destination directory does not exist \"$DEST\" "
+		log_echo " exiting... "
 		exit 1
 	fi
 
@@ -191,8 +193,8 @@ fi
 MESSAGE_START="Working..."
 MESSAGE_END="Bye!"
 
-FILE_LOG="rsync.log"
-FILE_ERR_LOG="rsync_err.log"
+FILE_LOG="kbt.log"
+FILE_ERR_LOG="kbt_error.log"
 
 if [ "$OS_TYPE" = "mac" ]; then
 	SOURCE="/Volumes/kudoji-hdd"
@@ -209,16 +211,16 @@ RS_PARAMS=""
 #-----------/constants and variables block
 
 menu_text="Script syncs source and destination folders where
-sourse is '$SOURCE'
-destination is '$DEST'
+ - source is \"$SOURCE\"
+ - destination is \"$DEST\"
 
 All output saves into two files:
-a log file: '$FILE_LOG'
-and an error log file: '$FILE_ERR_LOG'
+ - a log file: \"$FILE_LOG\"
+ - an error log file: \"$FILE_ERR_LOG\"
 
 WARNING! Script makes the destination folder identical to the source
 
-Please select:
+Please select action:
 
 1. sync test & exit
 2. sync & exit
