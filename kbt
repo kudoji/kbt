@@ -198,8 +198,8 @@ fi
 MESSAGE_START="Working..."
 MESSAGE_END="Bye!"
 
-FILE_LOG="kbt.log"
-FILE_ERR_LOG="kbt_error.log"
+FILE_LOG="./logs/kbt.log"
+FILE_ERR_LOG="./logs/kbt_error.log"
 
 if [ "$OS_TYPE" = "mac" ]; then
 	SOURCE="/Volumes/kudoji-hdd"
