@@ -71,16 +71,6 @@ function do_rsync {
 		msg="do sync test"
 	fi
 
-	local videos=""
-	local music=""
-	if [ "$OS_TYPE" = "mac" ]; then
-		videos="videos"
-		music="musics"
-	elif [ "$OS_TYPE" = "linux" ]; then
-		videos="Videos"
-		music="Music"
-	fi
-
 	local rsync_params=(-ahi --progress --copy-dirlinks $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
 	local rsync_params_delete=("${rsync_params[@]}")
 	rsync_params_delete+=( --delete)
@@ -314,7 +304,6 @@ else
 	echo "Unknown OS type. Exit..."
 	exit 2
 fi
-DEST="/Volumes/kudoji-hdd/kbt_test"
 
 RS_PARAMS=""
 CONFIG="./config.lan"
