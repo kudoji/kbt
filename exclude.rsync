@@ -1,3 +1,7 @@
+kbt_backup/local/mirror/*
+kbt_backup/local/update/*
+kbt_backup/lan/mirror/*
+kbt_backup/lan/update/*
 .DS_Store
 ._*
 Thumbs.db
