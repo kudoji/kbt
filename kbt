@@ -91,7 +91,7 @@ function do_rsync {
 		music="Music"
 	fi
 
-	local rsync_params=(-vahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
+	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
 	local rsync_params_delete=("${rsync_params[@]}")
 	rsync_params_delete+=( --delete)
 
@@ -161,15 +161,13 @@ function do_rsync_lan {
 		lines_array[1]=22
 	fi
 
-	#local rsync_params=(-vahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE --rsh "ssh -p ${lines_array[1]}")
-	local rsync_params=(-vahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
+	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE --rsh "ssh -p ${lines_array[1]}")
 	local rsync_params_delete=("${rsync_params[@]}")
 	rsync_params_delete+=( --delete)
 
 	log_echo "trying to establish connection to '${lines_array[0]}:${lines_array[1]}'..."
 
-	#rsync "${rsync_params_delete[@]}" "$SOURCE/cloud/Dropbox.zip" "${lines_array[0]}:cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	rsync "${rsync_params_delete[@]}" "$SOURCE/cloud/Dropbox.zip" "/Volumes/kudoji-hdd/hp-mount/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	rsync "${rsync_params_delete[@]}" "$SOURCE/cloud/Dropbox/" "${lines_array[0]}:cloud/Dropbox/" >> $FILE_LOG 2>> $FILE_ERR_LOG
 
 	return 0
 }
@@ -240,7 +238,7 @@ OS_TYPE=""
 get_os_type
 if [[ -z OS_TYPE ]]; then
 	echo "Unknown OS type. Exit..."
-	exit
+	exit 2
 fi
 
 MESSAGE_START="Working..."
@@ -257,12 +255,12 @@ elif [ "$OS_TYPE" = "linux" ]; then
 	DEST="/media/kudoji/kudoji-wd"
 else
 	echo "Unknown OS type. Exit..."
-	exit
+	exit 2
 fi
 
 RS_PARAMS=""
-CONFIG="config.lan"
-RSYNC_EXCLUDE_FILE="exclude.rsync"
+CONFIG="./config.lan"
+RSYNC_EXCLUDE_FILE="./exclude.rsync"
 #-----------/constants and variables block
 
 menu_text="Script syncs source and destination folders where
