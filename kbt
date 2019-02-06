@@ -58,7 +58,7 @@ function log_echo {
 	local msg="[$(date '+%Y%m%d %H:%M:%S')]"
 
 	if [[ ! -z $1 ]]; then
-		msg="$msg ---$1---"
+		msg="$msg --- $1 ---"
 	fi
 	echo $msg
 }
@@ -71,16 +71,6 @@ function do_rsync {
 		msg="do sync test"
 	fi
 
-	if [[ ! -d $SOURCE ]]; then
-		log_echo " error: source directory does not exist \"$SOURCE\" "
-		log_echo " exiting... "
-		exit 1
-	elif [[ ! -d $DEST ]]; then
-		log_echo " error: destination directory does not exist \"$DEST\" "
-		log_echo " exiting... "
-		exit 1
-	fi
-
 	local videos=""
 	local music=""
 	if [ "$OS_TYPE" = "mac" ]; then
@@ -91,41 +81,33 @@ function do_rsync {
 		music="Music"
 	fi
 
-	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
+	local rsync_params=(-ahi --progress --copy-dirlinks $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
 	local rsync_params_delete=("${rsync_params[@]}")
 	rsync_params_delete+=( --delete)
 
-	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_LOG
-	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
+	log_echo "(begin) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_LOG
+	log_echo "(begin) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_ERR_LOG
 
-	if [[ ! -d "$SOURCE/$videos/" ]]; then
-		log_echo "source directory does not exist ($SOURCE/$videos/"
-	else
-		rsync "${rsync_params_delete[@]}" "$SOURCE/$videos/" "$DEST/videos/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	fi
-	if [[ ! -d "$SOURCE/videos_seen/" ]]; then
-		log_echo "source directory does not exist ($SOURCE/videos_seen/"
-	else
-		rsync "${rsync_params[@]}" "$SOURCE/videos_seen/" "$DEST/videos_seen/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	fi
-	if [[ ! -d "$SOURCE/$music/" ]]; then
-		log_echo "source directory does not exist ($SOURCE/$music/"
-	else
-		rsync "${rsync_params_delete[@]}" "$SOURCE/$music/" "$DEST/musics/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	fi
-	if [[ ! -d "$SOURCE/trainings/" ]]; then
-		log_echo "source directory does not exist ($SOURCE/trainings/"
-	else
-		rsync "${rsync_params_delete[@]}" "$SOURCE/trainings/" "$DEST/trainings/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	fi
-	if [[ ! -d "$SOURCE/cloud/" ]]; then
-		log_echo "source directory does not exist ($SOURCE/cloud/"
-	else
-		rsync "${rsync_params_delete[@]}" "$SOURCE/cloud/" "$DEST/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
-	fi
+	find $SOURCE_LOCAL_MIRROR -maxdepth 1 -type l -print0 |
+		while IFS= read -r -d '' file; do
+			filename="$(basename "$file")"
+			rsync "${rsync_params_delete[@]}" "$SOURCE_LOCAL_MIRROR/$filename/" "$DEST/$filename/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+		done
+	log_echo "(end) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_LOG
+	log_echo "(end) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_ERR_LOG
 
-	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_LOG
-	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
+
+	log_echo "(begin) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_LOG
+	log_echo "(begin) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_ERR_LOG
+
+	find $SOURCE_LOCAL_UPDATE -maxdepth 1 -type l -print0 |
+		while IFS= read -r -d '' file; do
+			filename="$(basename "$file")"
+			rsync "${rsync_params[@]}" "$SOURCE_LOCAL_UPDATE/$filename/" "$DEST/$filename/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+		done
+
+	log_echo "(end) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_LOG
+	log_echo "(end) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_ERR_LOG
 
 	return 0
 }
@@ -228,6 +210,77 @@ function get_os_type {
 	esac
 }
 
+#	make sure that script's configuration is correct
+function script_init {
+	if [[ ! -d "$SOURCE" ]]; then
+		log_echo "error: source directory does not exist ($SOURCE), exitting..."
+		exit 1
+	fi
+
+	if [[ ! -d "$SOURCE_LOCAL_MIRROR" ]]; then
+		log_echo "error: mirror directory does not exist in source ($SOURCE_LOCAL_MIRROR), exitting..."
+		exit 1
+	fi
+
+	if [[ ! -d "$SOURCE_LOCAL_UPDATE" ]]; then
+		log_echo "error: update directory does not exist in source ($SOURCE_LOCAL_UPDATE), exitting..."
+		exit 1
+	fi
+
+	if [[ ! -d "$SOURCE_LAN_MIRROR" ]]; then
+		log_echo "error: mirror directory does not exist in source ($SOURCE_LAN_MIRROR), exitting..."
+		exit 1
+	fi
+
+	if [[ ! -d "$SOURCE_LAN_UPDATE" ]]; then
+		log_echo "error: update directory does not exist in source ($SOURCE_LAN_UPDATE), exitting..."
+		exit 1
+	fi
+
+	local mirror_files=$(ls "$SOURCE_LOCAL_MIRROR" | wc -l)+$(ls "$SOURCE_LAN_MIRROR" | wc -l)
+	local update_files=$(ls "$SOURCE_LOCAL_UPDATE" | wc -l)+$(ls "$SOURCE_LAN_UPDATE" | wc -l)
+
+	if [[ mirror_files -eq 0 ]] && [[ update_files -eq 0 ]]; then
+		log_echo "error: source directory is not set properly ($SOURCE), exitting..."
+		exit 1
+	fi
+}
+
+function check_local_config {
+	local mirror_files=$(ls "$SOURCE_LOCAL_MIRROR" | wc -l)
+	local update_files=$(ls "$SOURCE_LOCAL_UPDATE" | wc -l)
+
+	if [[ $? -ne 0 ]]; then
+		log_echo "error: ls/wc failed to run, exitting..."
+		exit 1
+	fi
+
+	if [[ mirror_files -eq 0 ]] && [[ update_files -eq 0 ]]; then
+		log_echo "error: source directory for local sync is not set properly ($SOURCE), exitting..."
+		exit 1
+	fi
+
+	if [[ ! -d $DEST ]]; then
+		log_echo "error: destination directory does not exist ($DEST), exitting..."
+		exit 1
+	fi
+}
+
+function check_lan_config {
+	local mirror_files=$(ls "$SOURCE_LAN_MIRROR" | wc -l)
+	local update_files=$(ls "$SOURCE_LAN_UPDATE" | wc -l)
+
+	if [[ $? -ne 0 ]]; then
+		log_echo "error: ls/wc failed to run, exitting..."
+		exit 1
+	fi
+
+	if [[ mirror_files -eq 0 ]] && [[ update_files -eq 0 ]]; then
+		log_echo "error: source directory for lan sync is not set properly ($SOURCE), exitting..."
+		exit 1
+	fi
+}
+
 if (( $(id -u) != 0 )); then
 	echo "Run script with sudo privileges"
 	exit
@@ -247,21 +300,28 @@ MESSAGE_END="Bye!"
 FILE_LOG="./logs/kbt.log"
 FILE_ERR_LOG="./logs/kbt_error.log"
 
+SOURCE="./kbt_backup"
+SOURCE_LOCAL_MIRROR="$SOURCE/local/mirror"
+SOURCE_LOCAL_UPDATE="$SOURCE/local/update"
+SOURCE_LAN_MIRROR="$SOURCE/lan/mirror"
+SOURCE_LAN_UPDATE="$SOURCE/lan/update"
+
 if [ "$OS_TYPE" = "mac" ]; then
-	SOURCE="/Volumes/kudoji-hdd"
 	DEST="/Volumes/kudoji-wd"
 elif [ "$OS_TYPE" = "linux" ]; then
-	SOURCE="/home/kudoji"
 	DEST="/media/kudoji/kudoji-wd"
 else
 	echo "Unknown OS type. Exit..."
 	exit 2
 fi
+DEST="/Volumes/kudoji-hdd/kbt_test"
 
 RS_PARAMS=""
 CONFIG="./config.lan"
 RSYNC_EXCLUDE_FILE="./exclude.rsync"
 #-----------/constants and variables block
+
+script_init
 
 menu_text="Script syncs source and destination folders where
  - source is \"$SOURCE\"
@@ -291,10 +351,12 @@ if [[ $menu_return -eq 0 ]]; then
 	exit 0
 elif [[ $menu_return -eq 1 ]]; then
 	echo $MESSAGE_START
+	check_local_config
 	RS_PARAMS="--dry-run"
 	do_rsync
 elif [[ $menu_return -eq 2 ]]; then
 	echo $MESSAGE_START
+	check_local_config
 	RS_PARAMS=""
 	do_rsync
 	do_cleanup "$DEST"
@@ -309,10 +371,12 @@ elif [[ $menu_return -eq 4 ]]; then
 	do_drives_sync
 elif [[ $menu_return -eq 5 ]]; then
 	echo $MESSAGE_START
+	check_lan_config
 	RS_PARAMS="--dry-run"
 	do_rsync_lan
 elif [[ $menu_return -eq 6 ]]; then
 	echo $MESSAGE_START
+	check_lan_config
 	RS_PARAMS=""
 	do_rsync_lan
 fi
