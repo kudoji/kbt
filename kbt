@@ -75,30 +75,38 @@ function do_rsync {
 	local rsync_params_delete=("${rsync_params[@]}")
 	rsync_params_delete+=( --delete)
 
-	log_echo "(begin) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_LOG
-	log_echo "(begin) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_ERR_LOG
-
 	find $SOURCE_LOCAL_MIRROR -maxdepth 1 -type l -print0 |
 		while IFS= read -r -d '' file; do
 			filename="$(basename "$file")"
-			rsync "${rsync_params_delete[@]}" "$SOURCE_LOCAL_MIRROR/$filename/" "$DEST/$filename/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+
+			source_local="$SOURCE_LOCAL_MIRROR/$filename/"
+			dest_local="$DEST/$filename/"
+
+			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_LOG
+			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_ERR_LOG
+
+			rsync "${rsync_params_delete[@]}" "$source_local" "$dest_local" >> $FILE_LOG 2>> $FILE_ERR_LOG
+
+			log_echo "(end) $msg from $source_local to $dest_local" >> $FILE_LOG
+			log_echo "(end) $msg from $source_local to $dest_local" >> $FILE_ERR_LOG
 		done
-	log_echo "(end) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_LOG
-	log_echo "(end) $msg from $SOURCE_LOCAL_MIRROR to $DEST" >> $FILE_ERR_LOG
 
-
-	log_echo "(begin) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_LOG
-	log_echo "(begin) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_ERR_LOG
 
 	find $SOURCE_LOCAL_UPDATE -maxdepth 1 -type l -print0 |
 		while IFS= read -r -d '' file; do
 			filename="$(basename "$file")"
-			rsync "${rsync_params[@]}" "$SOURCE_LOCAL_UPDATE/$filename/" "$DEST/$filename/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+
+			source_local="$SOURCE_LOCAL_UPDATE/$filename/"
+			dest_local="$DEST/$filename/"
+
+			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_LOG
+			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_ERR_LOG
+
+			rsync "${rsync_params[@]}" "$source_local" "$dest_local" >> $FILE_LOG 2>> $FILE_ERR_LOG
+
+			log_echo "(end) $msg from $source_local to $dest_local" >> $FILE_LOG
+			log_echo "(end) $msg from $source_local to $dest_local" >> $FILE_ERR_LOG
 		done
-
-	log_echo "(end) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_LOG
-	log_echo "(end) $msg from $SOURCE_LOCAL_UPDATE to $DEST" >> $FILE_ERR_LOG
-
 	return 0
 }
 
@@ -124,7 +132,7 @@ function do_rsync_lan {
 	if [[ -z ${lines_array[0]} ]]; then
 		log_echo "error: remote user name and host are not specified"
 		log_echo "use the following format 'user_name@host'"
-		log_echo " exiting... "
+		log_echo "exiting..."
 		exit 1
 	fi
 
@@ -139,46 +147,37 @@ function do_rsync_lan {
 
 	log_echo "trying to establish connection to '${lines_array[0]}:${lines_array[1]}'..."
 
-	rsync "${rsync_params_delete[@]}" "$SOURCE/cloud/Dropbox/" "${lines_array[0]}:cloud/Dropbox/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+	find $SOURCE_LAN_MIRROR -maxdepth 1 -type l -print0 |
+		while IFS= read -r -d '' file; do
+			filename="$(basename "$file")"
 
-	return 0
-}
+			source_lan="$SOURCE_LAN_MIRROR/$filename/"
+			dest_lan="${lines_array[0]}:$filename/"
 
-# cleans $1 directory
-function do_cleanup {
-	local directory=$1
+			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_LOG
+			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_ERR_LOG
 
-	if [[ -z $directory ]]; then
-		echo "function do_cleanup() must have one parameter"
-		exit
-	fi
+			rsync "${rsync_params_delete[@]}" "$source_lan" "$dest_lan" >> $FILE_LOG 2>> $FILE_ERR_LOG
 
-	if [[ ! -d $directory ]]; then
-		log_echo "dest directory does not exist ($DEST)"
-		exit 1
-	fi
+			log_echo "(end) $msg from $source_lan to $dest_lan" >> $FILE_LOG
+			log_echo "(end) $msg from $source_lan to $dest_lan" >> $FILE_ERR_LOG
+		done
+	
+	find $SOURCE_LAN_UPDATE -maxdepth 1 -type l -print0 |
+		while IFS= read -r -d '' file; do
+			filename="$(basename "$file")"
 
-	log_echo "(begin) cleanup ($directory)" >> $FILE_LOG
-	log_echo "(begin) cleanup ($directory)" >> $FILE_ERR_LOG
+			source_lan="$SOURCE_LAN_UPDATE/$filename/"
+			dest_lan="${lines_array[0]}:$filename/"
 
-	find "$directory/videos/" -name "._*" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-	find "$directory/videos/" -name ".DS_Store" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
+			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_LOG
+			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_ERR_LOG
 
-	find "$directory/videos_seen/" -name "._*" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-	find "$directory/videos_seen/" -name ".DS_Store" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
+			rsync "${rsync_params[@]}" "$source_lan" "$dest_lan" >> $FILE_LOG 2>> $FILE_ERR_LOG
 
-	find "$directory/musics/" -name "._*" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-	find "$directory/musics/" -name ".DS_Store" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-
-	find "$directory/trainings/Japanese/" -name "._*" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-	find "$directory/trainings/body/" -name "._*" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-	find "$directory/trainings/" -name ".DS_Store" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-
-	find "$directory/cloud/" -name "._*" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-	find "$directory/cloud/" -name ".DS_Store" -delete -print >> $FILE_LOG 2>> $FILE_ERR_LOG
-
-	log_echo "(end) cleanup ($directory)" >> $FILE_LOG
-	log_echo "(end) cleanup ($directory)" >> $FILE_ERR_LOG
+			log_echo "(end) $msg from $source_lan to $dest_lan" >> $FILE_LOG
+			log_echo "(end) $msg from $source_lan to $dest_lan" >> $FILE_ERR_LOG
+		done
 
 	return 0
 }
@@ -326,14 +325,12 @@ Please select action:
 
 1. sync test & exit
 2. sync & exit
-3. cleanup dest directory
-4. cleanup source directory
-5. lan sync test & exit
-6. lan sync & exit
+3. lan sync test & exit
+4. lan sync & exit
 0. exit
 "
 
-menu "$menu_text" 6
+menu "$menu_text" 4
 
 if [[ $menu_return -eq 0 ]]; then
 	echo $MESSAGE_END
@@ -348,22 +345,13 @@ elif [[ $menu_return -eq 2 ]]; then
 	check_local_config
 	RS_PARAMS=""
 	do_rsync
-	do_cleanup "$DEST"
 	do_drives_sync
 elif [[ $menu_return -eq 3 ]]; then
-	echo $MESSAGE_START
-	do_cleanup "$DEST"
-	do_drives_sync
-elif [[ $menu_return -eq 4 ]]; then
-	echo $MESSAGE_START
-	do_cleanup "$SOURCE"
-	do_drives_sync
-elif [[ $menu_return -eq 5 ]]; then
 	echo $MESSAGE_START
 	check_lan_config
 	RS_PARAMS="--dry-run"
 	do_rsync_lan
-elif [[ $menu_return -eq 6 ]]; then
+elif [[ $menu_return -eq 4 ]]; then
 	echo $MESSAGE_START
 	check_lan_config
 	RS_PARAMS=""
