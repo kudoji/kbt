@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-#	kbt v0.1.1
+#	kbt v0.1.3
 #
 
 #
@@ -91,37 +91,83 @@ function do_rsync {
 		music="Music"
 	fi
 
+	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
+	local rsync_params_delete=("${rsync_params[@]}")
+	rsync_params_delete+=( --delete)
+
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_LOG
 	log_echo "(begin) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
 
 	if [[ ! -d "$SOURCE/$videos/" ]]; then
-		log_echo "source directory does not exists ($SOURCE/$videos/"
+		log_echo "source directory does not exist ($SOURCE/$videos/"
 	else
-		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/$videos/" "$DEST/videos/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+		rsync "${rsync_params_delete[@]}" "$SOURCE/$videos/" "$DEST/videos/" >> $FILE_LOG 2>> $FILE_ERR_LOG
 	fi
 	if [[ ! -d "$SOURCE/videos_seen/" ]]; then
-		log_echo "source directory does not exists ($SOURCE/videos_seen/"
+		log_echo "source directory does not exist ($SOURCE/videos_seen/"
 	else
-		rsync -vahzi --progress $RS_PARAMS "$SOURCE/videos_seen/" "$DEST/videos_seen/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+		rsync "${rsync_params[@]}" "$SOURCE/videos_seen/" "$DEST/videos_seen/" >> $FILE_LOG 2>> $FILE_ERR_LOG
 	fi
 	if [[ ! -d "$SOURCE/$music/" ]]; then
-		log_echo "source directory does not exists ($SOURCE/$music/"
+		log_echo "source directory does not exist ($SOURCE/$music/"
 	else
-		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/$music/" "$DEST/musics/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+		rsync "${rsync_params_delete[@]}" "$SOURCE/$music/" "$DEST/musics/" >> $FILE_LOG 2>> $FILE_ERR_LOG
 	fi
 	if [[ ! -d "$SOURCE/trainings/" ]]; then
-		log_echo "source directory does not exists ($SOURCE/trainings/"
+		log_echo "source directory does not exist ($SOURCE/trainings/"
 	else
-		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/trainings/" "$DEST/trainings/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+		rsync "${rsync_params_delete[@]}" "$SOURCE/trainings/" "$DEST/trainings/" >> $FILE_LOG 2>> $FILE_ERR_LOG
 	fi
 	if [[ ! -d "$SOURCE/cloud/" ]]; then
-		log_echo "source directory does not exists ($SOURCE/cloud/"
+		log_echo "source directory does not exist ($SOURCE/cloud/"
 	else
-		rsync -vahzi --delete --progress $RS_PARAMS "$SOURCE/cloud/" "$DEST/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
+		rsync "${rsync_params_delete[@]}" "$SOURCE/cloud/" "$DEST/cloud/" >> $FILE_LOG 2>> $FILE_ERR_LOG
 	fi
 
 	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_LOG
 	log_echo "(end) $msg from $SOURCE to $DEST" >> $FILE_ERR_LOG
+
+	return 0
+}
+
+function do_rsync_lan {
+	local msg=""
+	if [[ -z $RS_PARAMS ]]; then
+		msg="do lan sync"
+	else
+		msg="do lan sync test"
+	fi
+
+	if [[ ! -f "./$CONFIG" ]]; then
+		log_echo "error: config file: '$CONFIG' does not exist"
+		log_echo " exiting... "
+		exit 1
+	fi
+
+	OLD_IFS=$IFS
+	IFS=$'\n'
+	lines_array=( $(head -n 2 "./$CONFIG") )
+	IFS=$OLD_IFS
+
+	if [[ -z ${lines_array[0]} ]]; then
+		log_echo "error: remote user name and host are not specified"
+		log_echo "use the following format 'user_name@host'"
+		log_echo " exiting... "
+		exit 1
+	fi
+
+	if [[ -z ${lines_array[1]} ]]; then
+		log_echo "remote port is not set, using default port number: 22"
+		lines_array[1]=22
+	fi
+
+	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE --rsh "ssh -p ${lines_array[1]}")
+	local rsync_params_delete=("${rsync_params[@]}")
+	rsync_params_delete+=( --delete)
+
+	log_echo "trying to establish connection to '${lines_array[0]}:${lines_array[1]}'..."
+
+	rsync "${rsync_params_delete[@]}" "$SOURCE/cloud/Dropbox/" "${lines_array[0]}:cloud/Dropbox/" >> $FILE_LOG 2>> $FILE_ERR_LOG
 
 	return 0
 }
@@ -192,7 +238,7 @@ OS_TYPE=""
 get_os_type
 if [[ -z OS_TYPE ]]; then
 	echo "Unknown OS type. Exit..."
-	exit
+	exit 2
 fi
 
 MESSAGE_START="Working..."
@@ -209,10 +255,12 @@ elif [ "$OS_TYPE" = "linux" ]; then
 	DEST="/media/kudoji/kudoji-wd"
 else
 	echo "Unknown OS type. Exit..."
-	exit
+	exit 2
 fi
 
 RS_PARAMS=""
+CONFIG="./config.lan"
+RSYNC_EXCLUDE_FILE="./exclude.rsync"
 #-----------/constants and variables block
 
 menu_text="Script syncs source and destination folders where
@@ -231,10 +279,12 @@ Please select action:
 2. sync & exit
 3. cleanup dest directory
 4. cleanup source directory
+5. lan sync test & exit
+6. lan sync & exit
 0. exit
 "
 
-menu "$menu_text" 4
+menu "$menu_text" 6
 
 if [[ $menu_return -eq 0 ]]; then
 	echo $MESSAGE_END
@@ -245,6 +295,7 @@ elif [[ $menu_return -eq 1 ]]; then
 	do_rsync
 elif [[ $menu_return -eq 2 ]]; then
 	echo $MESSAGE_START
+	RS_PARAMS=""
 	do_rsync
 	do_cleanup "$DEST"
 	do_drives_sync
@@ -256,6 +307,14 @@ elif [[ $menu_return -eq 4 ]]; then
 	echo $MESSAGE_START
 	do_cleanup "$SOURCE"
 	do_drives_sync
+elif [[ $menu_return -eq 5 ]]; then
+	echo $MESSAGE_START
+	RS_PARAMS="--dry-run"
+	do_rsync_lan
+elif [[ $menu_return -eq 6 ]]; then
+	echo $MESSAGE_START
+	RS_PARAMS=""
+	do_rsync_lan
 fi
 
 echo ""
