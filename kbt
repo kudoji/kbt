@@ -71,7 +71,7 @@ function do_rsync {
 		msg="do sync test"
 	fi
 
-	local rsync_params=(-ahi --progress --copy-dirlinks $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
+	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE)
 	local rsync_params_delete=("${rsync_params[@]}")
 	rsync_params_delete+=( --delete)
 
@@ -80,7 +80,12 @@ function do_rsync {
 			filename="$(basename "$file")"
 
 			source_local="$SOURCE_LOCAL_MIRROR/$filename/"
-			dest_local="$DEST/$filename/"
+			dest_local="$DEST_LOCAL/$filename/"
+
+			if [[ ! -d "$source_local" ]]; then
+				log_echo "warning: source directory does not exist ($source_local), skipping..."
+				continue
+			fi
 
 			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_LOG
 			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_ERR_LOG
@@ -97,7 +102,12 @@ function do_rsync {
 			filename="$(basename "$file")"
 
 			source_local="$SOURCE_LOCAL_UPDATE/$filename/"
-			dest_local="$DEST/$filename/"
+			dest_local="$DEST_LOCAL/$filename/"
+
+			if [[ ! -d "$source_local" ]]; then
+				log_echo "warning: source directory does not exist ($source_local), skipping..."
+				continue
+			fi
 
 			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_LOG
 			log_echo "(begin) $msg from $source_local to $dest_local" >> $FILE_ERR_LOG
@@ -118,15 +128,9 @@ function do_rsync_lan {
 		msg="do lan sync test"
 	fi
 
-	if [[ ! -f "./$CONFIG" ]]; then
-		log_echo "error: config file: '$CONFIG' does not exist"
-		log_echo " exiting... "
-		exit 1
-	fi
-
 	OLD_IFS=$IFS
 	IFS=$'\n'
-	lines_array=( $(head -n 2 "./$CONFIG") )
+	lines_array=( $(head -n 2 "$DEST_LAN") )
 	IFS=$OLD_IFS
 
 	if [[ -z ${lines_array[0]} ]]; then
@@ -141,11 +145,9 @@ function do_rsync_lan {
 		lines_array[1]=22
 	fi
 
-	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE --rsh "ssh -p ${lines_array[1]}")
+	local rsync_params=(-ahi --progress $RS_PARAMS --exclude-from=$RSYNC_EXCLUDE_FILE  --keep-dirlinks --rsh "ssh -o ConnectTimeout=1 -o ConnectionAttempts=3 -p ${lines_array[1]}")
 	local rsync_params_delete=("${rsync_params[@]}")
 	rsync_params_delete+=( --delete)
-
-	log_echo "trying to establish connection to '${lines_array[0]}:${lines_array[1]}'..."
 
 	find $SOURCE_LAN_MIRROR -maxdepth 1 -type l -print0 |
 		while IFS= read -r -d '' file; do
@@ -154,8 +156,14 @@ function do_rsync_lan {
 			source_lan="$SOURCE_LAN_MIRROR/$filename/"
 			dest_lan="${lines_array[0]}:$filename/"
 
+			if [[ ! -d "$source_lan" ]]; then
+				log_echo "warning: source directory does not exist ($source_lan), skipping..."
+				continue
+			fi
+
 			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_LOG
 			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_ERR_LOG
+			log_echo "trying to establish connection to '${lines_array[0]}:${lines_array[1]}'..."
 
 			rsync "${rsync_params_delete[@]}" "$source_lan" "$dest_lan" >> $FILE_LOG 2>> $FILE_ERR_LOG
 
@@ -169,6 +177,11 @@ function do_rsync_lan {
 
 			source_lan="$SOURCE_LAN_UPDATE/$filename/"
 			dest_lan="${lines_array[0]}:$filename/"
+
+			if [[ ! -d "$source_lan" ]]; then
+				log_echo "warning: source directory does not exist ($source_lan), skipping..."
+				continue
+			fi
 
 			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_LOG
 			log_echo "(begin) $msg from $source_lan to $dest_lan" >> $FILE_ERR_LOG
@@ -189,48 +202,48 @@ function do_drives_sync {
 	log_echo "(end) drives syncing" >> $FILE_LOG
 }
 
-function get_os_type {
-	OS_TYPE=""
-	local uname_out="$(uname -s)"
-	case "${uname_out}" in
-		Darwin*)	OS_TYPE="mac";;
-		Linux*)	OS_TYPE="linux";;
-		*)	OS_TYPE="";;
-	esac
+function create_dir_or_exit {
+	if [[ -z $1 ]];	then
+		log_echo "function create_dir_or_exit() must have one parameter, quitting..."
+		exit 1
+	fi
+
+	mkdir -p "$1"
+	if [[ $? -ne 0 ]]; then
+		log_echo "error: failed to create directory ($1), quitting..."
+		exit 1
+	fi
+
+	return 0
+}
+
+function create_settings_directory_structure {
+	create_dir_or_exit "$SOURCE_LOCAL_MIRROR"
+	create_dir_or_exit "$SOURCE_LOCAL_UPDATE"
+	create_dir_or_exit "$SOURCE_LAN_MIRROR"
+	create_dir_or_exit "$SOURCE_LAN_UPDATE"
+
+	return 0
 }
 
 #	make sure that script's configuration is correct
 function script_init {
-	if [[ ! -d "$SOURCE" ]]; then
-		log_echo "error: source directory does not exist ($SOURCE), exitting..."
-		exit 1
+	if [[ ! -d "$SETTINGS_DIR" ]]; then
+		log_echo "settings directory structure does not exist ($SETTINGS_DIR), atempting to create it..."
+
+		create_settings_directory_structure
+
+		if [[ $? -ne 0 ]]; then
+			log_echo "error: failed to create settings directory structure ($SETTINGS_DIR), quitting..."
+			exit 1
+		fi
 	fi
 
-	if [[ ! -d "$SOURCE_LOCAL_MIRROR" ]]; then
-		log_echo "error: mirror directory does not exist in source ($SOURCE_LOCAL_MIRROR), exitting..."
-		exit 1
-	fi
-
-	if [[ ! -d "$SOURCE_LOCAL_UPDATE" ]]; then
-		log_echo "error: update directory does not exist in source ($SOURCE_LOCAL_UPDATE), exitting..."
-		exit 1
-	fi
-
-	if [[ ! -d "$SOURCE_LAN_MIRROR" ]]; then
-		log_echo "error: mirror directory does not exist in source ($SOURCE_LAN_MIRROR), exitting..."
-		exit 1
-	fi
-
-	if [[ ! -d "$SOURCE_LAN_UPDATE" ]]; then
-		log_echo "error: update directory does not exist in source ($SOURCE_LAN_UPDATE), exitting..."
-		exit 1
-	fi
-
-	local mirror_files=$(ls "$SOURCE_LOCAL_MIRROR" | wc -l)+$(ls "$SOURCE_LAN_MIRROR" | wc -l)
-	local update_files=$(ls "$SOURCE_LOCAL_UPDATE" | wc -l)+$(ls "$SOURCE_LAN_UPDATE" | wc -l)
+	local mirror_files="$(($(ls "$SOURCE_LOCAL_MIRROR" | wc -l) + $(ls "$SOURCE_LAN_MIRROR" | wc -l)))"
+	local update_files="$(($(ls "$SOURCE_LOCAL_UPDATE" | wc -l) + $(ls "$SOURCE_LAN_UPDATE" | wc -l)))"
 
 	if [[ mirror_files -eq 0 ]] && [[ update_files -eq 0 ]]; then
-		log_echo "error: source directory is not set properly ($SOURCE), exitting..."
+		log_echo "error: settings directory is not set properly ($SETTINGS_DIR), quitting..."
 		exit 1
 	fi
 }
@@ -240,17 +253,22 @@ function check_local_config {
 	local update_files=$(ls "$SOURCE_LOCAL_UPDATE" | wc -l)
 
 	if [[ $? -ne 0 ]]; then
-		log_echo "error: ls/wc failed to run, exitting..."
+		log_echo "error: ls/wc failed to run, quitting..."
 		exit 1
 	fi
 
 	if [[ mirror_files -eq 0 ]] && [[ update_files -eq 0 ]]; then
-		log_echo "error: source directory for local sync is not set properly ($SOURCE), exitting..."
+		log_echo "error: settings directory for local sync is not set properly ($SETTINGS_DIR), quitting..."
 		exit 1
 	fi
 
-	if [[ ! -d $DEST ]]; then
-		log_echo "error: destination directory does not exist ($DEST), exitting..."
+	if [[ ! -L $DEST_LOCAL ]]; then
+		log_echo "error: destination symlink does not exist ($DEST_LOCAL), quitting..."
+		exit 1
+	fi
+
+	if [[ ! -d $DEST_LOCAL ]]; then
+		log_echo "error: destination directory is not accessible ($DEST_LOCAL), quitting..."
 		exit 1
 	fi
 }
@@ -260,66 +278,56 @@ function check_lan_config {
 	local update_files=$(ls "$SOURCE_LAN_UPDATE" | wc -l)
 
 	if [[ $? -ne 0 ]]; then
-		log_echo "error: ls/wc failed to run, exitting..."
+		log_echo "error: ls/wc failed to run, quitting..."
 		exit 1
 	fi
 
 	if [[ mirror_files -eq 0 ]] && [[ update_files -eq 0 ]]; then
-		log_echo "error: source directory for lan sync is not set properly ($SOURCE), exitting..."
+		log_echo "error: settings directory for lan sync is not set properly ($SETTINGS_DIR), quitting..."
+		exit 1
+	fi
+
+	if [[ ! -f $DEST_LAN ]]; then
+		log_echo "error: config for lan sync does not exist ($DEST_LAN), quitting..."
 		exit 1
 	fi
 }
 
-if (( $(id -u) != 0 )); then
-	echo "Run script with sudo privileges"
-	exit
+if (( $(id -u) == 0 )); then
+	log_echo "error: for the sake of safety do not run the script with sudo privileges"
+	exit 1
 fi
 
 #-----------constants and variables block
-OS_TYPE=""
-get_os_type
-if [[ -z OS_TYPE ]]; then
-	echo "Unknown OS type. Exit..."
-	exit 2
-fi
-
 MESSAGE_START="Working..."
 MESSAGE_END="Bye!"
 
 FILE_LOG="./logs/kbt.log"
 FILE_ERR_LOG="./logs/kbt_error.log"
 
-SOURCE="./kbt_backup"
-SOURCE_LOCAL_MIRROR="$SOURCE/local/mirror"
-SOURCE_LOCAL_UPDATE="$SOURCE/local/update"
-SOURCE_LAN_MIRROR="$SOURCE/lan/mirror"
-SOURCE_LAN_UPDATE="$SOURCE/lan/update"
-
-if [ "$OS_TYPE" = "mac" ]; then
-	DEST="/Volumes/kudoji-wd"
-elif [ "$OS_TYPE" = "linux" ]; then
-	DEST="/media/kudoji/kudoji-wd"
-else
-	echo "Unknown OS type. Exit..."
-	exit 2
-fi
+SETTINGS_DIR="$HOME/.kbt"
+SOURCE_LOCAL_MIRROR="$SETTINGS_DIR/local/mirror"
+SOURCE_LOCAL_UPDATE="$SETTINGS_DIR/local/update"
+DEST_LOCAL="$SETTINGS_DIR/local/dest"
+SOURCE_LAN_MIRROR="$SETTINGS_DIR/lan/mirror"
+SOURCE_LAN_UPDATE="$SETTINGS_DIR/lan/update"
+DEST_LAN="$SETTINGS_DIR/lan/config.lan"
 
 RS_PARAMS=""
-CONFIG="./config.lan"
 RSYNC_EXCLUDE_FILE="./exclude.rsync"
 #-----------/constants and variables block
 
 script_init
 
 menu_text="Script syncs source and destination folders where
- - source is \"$SOURCE\"
- - destination is \"$DEST\"
+ - source is \"$SETTINGS_DIR\"
+ - destination is \"$DEST_LOCAL\"
 
-All output saves into two files:
- - a log file: \"$FILE_LOG\"
+All output logs into two files:
+ - a regular log file: \"$FILE_LOG\"
  - an error log file: \"$FILE_ERR_LOG\"
 
-WARNING! Script makes the destination folder identical to the source
+WARNING! Run test options first to understand consequences first
 
 Please select action:
 
