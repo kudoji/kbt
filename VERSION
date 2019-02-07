@@ -1,3 +1,12 @@
+[0.1.3]
+
+* move logs to separate folder (feature #71)
+* implement rsync over lan (feature #121)
+* add licence (feature #3)
+* remove hardcoded dirs to config file(s) (feature #124)
+* move settings to $HOME (feature #125)
+* update readme file for new functionality (feature #123)
+
 [0.1.1]
 
  * merge scripts (#6c6556e24a)
