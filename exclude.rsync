@@ -1,0 +1,7 @@
+.kbt/local/mirror/*
+.kbt/local/update/*
+.kbt/lan/mirror/*
+.kbt/lan/update/*
+.DS_Store
+._*
+Thumbs.db
